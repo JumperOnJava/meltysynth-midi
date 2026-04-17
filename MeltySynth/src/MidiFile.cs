@@ -12,8 +12,10 @@ namespace MeltySynth
     /// </summary>
     public sealed class MidiFile
     {
-        private Message[] messages;
-        private TimeSpan[] times;
+        public Message[] messages;
+        public TimeSpan[] times;
+        private short resolution;
+        public double tempo;
 
         /// <summary>
         /// Loads a MIDI file from the stream.
@@ -178,6 +180,7 @@ namespace MeltySynth
 
                 var trackCount = reader.ReadInt16BigEndian();
                 var resolution = reader.ReadInt16BigEndian();
+                this.resolution = resolution;
 
                 var messageLists = new List<Message>[trackCount];
                 var tickLists = new List<int>[trackCount];
@@ -209,7 +212,7 @@ namespace MeltySynth
                     }
                 }
 
-                (messages, times) = MergeTracks(messageLists, tickLists, resolution);
+                (messages, times, this.tempo) = MergeTracks(messageLists, tickLists, resolution);
             }
         }
 
@@ -290,7 +293,8 @@ namespace MeltySynth
                                 return (messages, ticks);
 
                             case 0x51: // Tempo
-                                messages.Add(Message.TempoChange(ReadTempo(reader)));
+                                var tempo = ReadTempo(reader);
+                                messages.Add(Message.TempoChange(tempo));
                                 ticks.Add(tick);
                                 break;
 
@@ -322,7 +326,7 @@ namespace MeltySynth
             }
         }
 
-        private static (Message[], TimeSpan[]) MergeTracks(List<Message>[] messageLists, List<int>[] tickLists, int resolution)
+        private static (Message[], TimeSpan[], double) MergeTracks(List<Message>[] messageLists, List<int>[] tickLists, int resolution)
         {
             var mergedMessages = new List<Message>();
             var mergedTimes = new List<TimeSpan>();
@@ -377,7 +381,7 @@ namespace MeltySynth
                 indices[minIndex]++;
             }
 
-            return (mergedMessages.ToArray(), mergedTimes.ToArray());
+            return (mergedMessages.ToArray(), mergedTimes.ToArray(), tempo);
         }
 
         private static int ReadTempo(BinaryReader reader)
@@ -405,12 +409,12 @@ namespace MeltySynth
         /// </summary>
         public TimeSpan Length => times.Last();
 
-        internal Message[] Messages => messages;
-        internal TimeSpan[] Times => times;
+        public Message[] Messages => messages;
+        public TimeSpan[] Times => times;
 
 
 
-        internal struct Message
+        public struct Message
         {
             private byte channel;
             private byte command;
@@ -554,7 +558,7 @@ namespace MeltySynth
 
 
 
-        internal enum MessageType
+        public enum MessageType
         {
             Normal = 0,
             TempoChange = 252,
